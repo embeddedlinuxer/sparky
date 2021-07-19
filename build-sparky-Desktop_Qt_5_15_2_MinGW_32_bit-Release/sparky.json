@@ -21,7 +21,7 @@
     "LOOP.SmallWaterPumpRate": "150",
     "LOOP.WaterPumpRate": "306.73",
     "LOOP.XDelay": "10",
-    "LOOP.YFreq": "1e+06",
+    "LOOP.YFreq": "0.001",
     "LOOP.ZTemp": "0.1",
     "LocalServer": "G:/",
     "MainServer": "G:/"
