@@ -1811,6 +1811,12 @@ void
 MainWindow::
 onActionSync()
 {
+	if (LOOP.isEEA)	
+	{
+		informUser(QString("LOOP ")+QString::number(LOOP.loopNumber),"FEATURE NO SUPPORT FOR EEA   " ,"Temperature Synchronization Is Not Supported in EEA");
+		return;
+	}
+
 	if (LOOP.isCal) 
 	{
 		informUser(QString("LOOP ")+QString::number(LOOP.loopNumber),"UNABLE TO SYNCHRONIZE   " ,"Unable To Synchronize During Calibration!");
@@ -3315,37 +3321,35 @@ startCalibration()
                 }
 
                 /// set file name
-				if (LOOP.runMode == SIMULATION_RUN)
+				if (LOOP.isEEA)
 				{
-					PIPE[pipe].file.setFileName(PIPE[pipe].mainDirPath+"\\"+ QString("CALIBRAT__").append(QString::number(LOOP.injectTemp)).append(LOOP.simExt));
-				}
-				else
-				{
-					if (LOOP.isEEA) // eea
+               		if ((LOOP.cut == HIGH) || (LOOP.cut == FULL))
 					{
-                		if ((LOOP.cut == HIGH) || (LOOP.cut == FULL))
-						{
-							/// set file name
-							PIPE[pipe].file.setFileName(PIPE[pipe].mainDirPath+"\\"+ QString::number(LOOP.saltStart->currentText().toDouble()*100).append("_100").append(LOOP.filExt));
+						/// get salinity index
+						LOOP.salinityIndex = 0;
+						while (SALINITY[LOOP.salinityIndex] != LOOP.saltStart->currentText()) LOOP.salinityIndex++;
 
-							/// get salinity index
-							LOOP.salinityIndex = 0;
-							while (SALINITY[LOOP.salinityIndex] != LOOP.saltStart->currentText()) LOOP.salinityIndex++;
-						}
-						else if (LOOP.cut == MID)
-						{
-							PIPE[pipe].file.setFileName(PIPE[pipe].mainDirPath+"\\"+ QString("OIL_").append(QString::number(LOOP.injectTemp)).append(LOOP.filExt));
-						}
-						else
-						{
-							PIPE[pipe].file.setFileName(PIPE[pipe].mainDirPath+"\\"+ QString("AMB").append("_").append(QString::number(LOOP.minTemp)).append(LOOP.filExt));
-						}
+						/// set file name
+						if (LOOP.runMode == SIMULATION_RUN) PIPE[pipe].file.setFileName(PIPE[pipe].mainDirPath+"\\"+ QString::number(LOOP.saltStart->currentText().toDouble()*100).append("_100").append(LOOP.simExt));
+						else PIPE[pipe].file.setFileName(PIPE[pipe].mainDirPath+"\\"+ QString::number(LOOP.saltStart->currentText().toDouble()*100).append("_100").append(LOOP.filExt));
+
 					}
-					else // razor
+					else if (LOOP.cut == MID)
 					{
-						PIPE[pipe].file.setFileName(PIPE[pipe].mainDirPath+"\\"+ QString("AMB").append("_").append(QString::number(LOOP.minTemp)).append(LOOP.filExt));
+						if (LOOP.runMode == SIMULATION_RUN) PIPE[pipe].file.setFileName(PIPE[pipe].mainDirPath+"\\"+ QString("OIL_").append(QString::number(LOOP.injectTemp)).append(LOOP.simExt));
+						else PIPE[pipe].file.setFileName(PIPE[pipe].mainDirPath+"\\"+ QString("OIL_").append(QString::number(LOOP.injectTemp)).append(LOOP.filExt));
 					}
-            	}
+					else
+					{
+						if (LOOP.runMode == SIMULATION_RUN) PIPE[pipe].file.setFileName(PIPE[pipe].mainDirPath+"\\"+ QString("OIL_").append(QString::number(LOOP.injectTemp)).append(LOOP.simExt));
+						else PIPE[pipe].file.setFileName(PIPE[pipe].mainDirPath+"\\"+ QString("AMB").append("_").append(QString::number(LOOP.minTemp)).append(LOOP.filExt));
+					}
+				}
+				else // razor
+				{
+					if (LOOP.runMode == SIMULATION_RUN) PIPE[pipe].file.setFileName(PIPE[pipe].mainDirPath+"\\"+ QString("CALIBRAT__").append(QString::number(LOOP.injectTemp)).append(LOOP.simExt));
+					else PIPE[pipe].file.setFileName(PIPE[pipe].mainDirPath+"\\"+ QString("AMB").append("_").append(QString::number(LOOP.minTemp)).append(LOOP.filExt));
+				}
         	}
 		}
 
@@ -3478,7 +3482,7 @@ readPipe(const int pipe, const bool checkStability)
     /// update display
     if (PIPE[pipe].status != DISABLED)
     {
-        if ((LOOP.runMode != TEMPRUN_MIN) && (LOOP.runMode != TEMPRUN_HIGH) && (LOOP.runMode != TEMPRUN_INJECT) && (LOOP.runMode != TEMPRUN_ONLY)) displayPipeReading(pipe, PIPE[pipe].watercut, PIPE[pipe].frequency_start, PIPE[pipe].frequency, PIPE[pipe].temperature, PIPE[pipe].oilrp);
+        if ((LOOP.runMode != TEMPRUN_MIN) && (LOOP.runMode != TEMPRUN_HIGH) && (LOOP.runMode != TEMPRUN_INJECT)) displayPipeReading(pipe, PIPE[pipe].watercut, PIPE[pipe].frequency_start, PIPE[pipe].frequency, PIPE[pipe].temperature, PIPE[pipe].oilrp);
         else displayPipeReading(pipe, LOOP.watercut, PIPE[pipe].frequency_start, PIPE[pipe].frequency, PIPE[pipe].temperature, PIPE[pipe].oilrp);
         delay(SLEEP_TIME);
     }
@@ -3870,7 +3874,7 @@ runInjection()
         if ((( LOOP.isOilRun && (LOOP.oilRunStop->text().toDouble() >= LOOP.watercut)) || 
 			( LOOP.isWaterRun && (LOOP.waterRunStop->text().toDouble() <= LOOP.watercut))) && LOOP.isPhase)
         {
-			            //// update calibration file with the latest reads
+			//// update calibration file with the latest reads
             for (int pipe = 0; pipe < 3; pipe++)
             {
                 if ((PIPE[pipe].status == ENABLED) && PIPE[pipe].checkBox->isChecked())
@@ -4052,15 +4056,24 @@ runInjection()
 			/// stop if razor
 			if ((!LOOP.isEEA) || (LOOP.cut == MID))
             {
-                /// finish calibration if razor
-                informUser(QString("LOOP ")+QString::number(LOOP.loopNumber),BLANK,"Calibration has finished successfully.");
+                /// finish calibration or simulation 
+                if (LOOP.runMode == SIMULATION_RUN) informUser(QString("LOOP ")+QString::number(LOOP.loopNumber),BLANK,"Simulation has finished successfully.");
+                else informUser(QString("LOOP ")+QString::number(LOOP.loopNumber),BLANK,"Calibration has finished successfully.");
                 onActionStop();
                 return;
             }
 			else if ((LOOP.cut == HIGH) || (LOOP.cut == FULL))
             {
+                if (LOOP.runMode == SIMULATION_RUN)
+				{
+					/// finish calibration if razor
+                	informUser(QString("LOOP ")+QString::number(LOOP.loopNumber),BLANK,"Simulation has finished successfully.");
+                	onActionStop();
+                	return;
+				}
+
                 informUser(QString("LOOP ")+QString::number(LOOP.loopNumber),("Calibration has finished at "), QString(SALINITY[LOOP.salinityIndex]).append(" \% Salinity."));
-       
+
 				if (LOOP.isWaterRun) 
 				{
 					/// finish if reached at stop_salinity
